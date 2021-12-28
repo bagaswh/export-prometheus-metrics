@@ -1,0 +1,14 @@
+{
+  "name": "export-prometheus-metrics",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "Bagas Wahyu Hidayah <bagaswh@protonmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.24.0",
+    "commander": "^8.3.0",
+    "csv-writer": "^1.6.0"
+  }
+}
