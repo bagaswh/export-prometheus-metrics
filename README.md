@@ -12,48 +12,29 @@ Output:
 {
   "commonLabels": {
     "cpu_model": "Intel Xeon",
-    "mem_total": [
-      {
-        "timestamp": 1640743239.311,
-        "value": "2097152000",
-        "__name__": "node_memory_MemTotal_bytes",
-        "instance": "demo.robustperception.io:9100",
-        "job": "node"
-      }
-    ],
-    "disk_capacity_usage": [
-      {
-        "timestamp": 1640743239.311,
-        "value": "41442127872",
-        "__name__": "node_filesystem_size_bytes",
-        "device": "/dev/vda1",
-        "fstype": "ext4",
-        "instance": "demo.robustperception.io:9100",
-        "job": "node",
-        "mountpoint": "/"
-      }
-    ]
+    "mem_total": "2097152000",
+    "disk_capacity_usage": "41442127872"
   },
   "metrics": {
     "cpu_usage": [
       {
-        "timestamp": 1640743229.311,
-        "value": "38.972441108614134",
+        "timestamp": 1640743352.411,
+        "value": "37.07999999821187",
         "instance": "demo.robustperception.io:9100"
       }
     ],
     "mem_usage": [
       {
-        "timestamp": 1640743229.311,
-        "value": "784982016",
+        "timestamp": 1640743352.411,
+        "value": "783663104",
         "instance": "demo.robustperception.io:9100",
         "job": "node"
       }
     ],
     "disk_capacity_usage": [
       {
-        "timestamp": 1640743229.311,
-        "value": "36.859833952495364",
+        "timestamp": 1640743352.411,
+        "value": "36.86604089246704",
         "device": "/dev/vda1",
         "fstype": "ext4",
         "instance": "demo.robustperception.io:9100",
