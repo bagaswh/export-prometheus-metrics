@@ -108,7 +108,7 @@ function isObject(thing) {
     const label = config.commonLabels[labelName];
     if (isObject(label)) {
       const metricsFromQuery = await getMetricsFromQuery(label.query, false);
-      metrics.commonLabels[labelName] = metricsFromQuery;
+      metrics.commonLabels[labelName] = metricsFromQuery[0]?.value;
     } else if (typeof label == "string") {
       metrics.commonLabels[labelName] = label;
     }
