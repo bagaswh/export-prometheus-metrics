@@ -1,74 +1,131 @@
-const Axios = require("axios").default.Axios;
+const axios = require("axios").default;
 const csv = require("csv-writer");
 const fs = require("fs");
 const { program } = require("commander");
 
 program
-  .option("-u, --prometheus-url <url>", "URL of Prometheus server")
+  .requiredOption("-u, --prometheus-url <url>", "URL of Prometheus server")
   .option("-q, --query <query>", "Query")
-  .option("-n, --query-name <queryName>", "Name the query to be shown in CSV");
+  .option("-n, --query-name <queryName>", "Name the query to be shown in CSV")
+  .option("-s, --start <start>", "Start time range", Date.now() / 1000)
+  .option("-d, --duration <duration>", "Duration range", 3600);
 program.parse(process.argv);
 
-let options = program.opts();
-options.queryName = options.queryName || options.query;
+let programOptions = program.opts();
+programOptions.queryName = programOptions.queryName || programOptions.query;
 
-let config = "{}";
+let config = {};
 try {
-  config = fs.readFileSync("./export.config.json", "utf-8");
-} catch (err) {}
-config = JSON.parse(config);
+  config = require("./export.config.example.js");
+} catch (err) {
+  config = {};
+}
 
-const axios = new Axios({
-  baseURL: options.prometheusUrl,
+const axiosInstance = axios.create({
+  baseURL: programOptions.prometheusUrl,
 });
 
-async function query(query, options = {}) {
-  const now = Date.now() / 1000;
-  const res = await axios.get(`api/v1/query_range`, {
+async function makeQuery(query, isRange = true, options = {}) {
+  const now = Number(programOptions.start);
+
+  const queryPath = isRange ? "query_range" : "query";
+  let params = {};
+  if (isRange) {
+    params = {
+      start: now - Number(programOptions.duration),
+      end: now,
+      step: 14,
+    };
+  } else {
+    params = {
+      time: now,
+    };
+  }
+  const res = await axiosInstance.get(`api/v1/${queryPath}`, {
     ...options,
     params: {
       query,
-      start: now - 100,
-      end: now,
-      step: 14,
+      ...params,
     },
   });
-  return JSON.parse(res.data).data;
+  return res.data.data;
+}
+
+class QueryMetricsError extends Error {
+  constructor(message, response, query) {
+    super(message);
+    this.response = response;
+    this.query = query;
+  }
+}
+
+async function getMetricsFromQuery(query, isRange = true) {
+  let prometheusData = {};
+  try {
+    prometheusData = await makeQuery(query, isRange);
+  } catch (err) {
+    throw new QueryMetricsError(
+      "Error querying metrics",
+      err.response.data,
+      query
+    );
+  }
+  let data = [];
+  if (prometheusData.result.length) {
+    const metric = prometheusData.result[0].metric;
+    let values = prometheusData.result[0][isRange ? "values" : "value"];
+    if (!isRange) {
+      values = [values];
+    }
+    data = values.map((value) => {
+      const obj = {
+        timestamp: value[0],
+        value: value[1],
+      };
+      Object.keys(metric).forEach((key) => {
+        obj[key] = metric[key];
+      });
+      (config.additionalData || []).forEach((item) => {
+        obj[item.key] = item.value;
+      });
+      return obj;
+    });
+  }
+  return data;
+}
+
+function isObject(thing) {
+  return typeof thing === "object" && !Array.isArray(thing) && thing !== null;
 }
 
 (async () => {
-  const prometheusData = await query(options.query);
-  const metric = prometheusData.result[0].metric;
-  const values = prometheusData.result[0].values;
-  const csvWriter = csv.createObjectCsvWriter({
-    path: "out.csv",
-    header: [
-      { id: "query", title: "query" },
-      { id: "timestamp", title: "timestamp" },
-      { id: "value", title: "value" },
-      ...Object.keys(metric).map((key) => ({
-        id: key,
-        title: key,
-      })),
-      ...(config.additionalData || []).map((item) => ({
-        id: item.key,
-        title: item.key,
-      })),
-    ],
-  });
-  const data = values.map((item) => {
-    const obj = {
-      query: options.queryName,
-      timestamp: item[0],
-      value: item[1],
-    };
-    Object.keys(metric).forEach((key) => {
-      obj[key] = metric[key];
+  const metrics = {
+    commonLabels: {},
+    metrics: {},
+  };
+
+  for (const labelName in config.commonLabels) {
+    const label = config.commonLabels[labelName];
+    if (isObject(label)) {
+      const metricsFromQuery = await getMetricsFromQuery(label.query, false);
+      metrics.commonLabels[labelName] = metricsFromQuery;
+    } else if (typeof label == "string") {
+      metrics.commonLabels[labelName] = label;
+    }
+  }
+
+  const queries = [];
+  if (programOptions.query) {
+    queries.push({
+      query: programOptions.query,
+      name: programOptions.queryName,
     });
-    (config.additionalData || []).forEach((item) => {
-      obj[item.key] = item.value;
-    });
-    return obj;
-  });
-  csvWriter.writeRecords(data);
+  }
+  queries.push(...(config.queries || []));
+  for (const queryItem of queries) {
+    metrics.metrics[queryItem.name || queryItem.query] =
+      await getMetricsFromQuery(queryItem.query);
+  }
+
+  console.log(JSON.stringify(metrics));
 })();
